@@ -31,7 +31,7 @@ public class CollateServiceImpl implements CollateService {
 	}
 
 	@Bean(name = "tableData")
-	public List<TableModel> tableData(@Qualifier(value = "rawSql") Map<ScriptType, List<SQLModel>> rawSql) {
+	public List<TableModel> tableData(@Qualifier("rawSql") Map<ScriptType, List<SQLModel>> rawSql) {
 		List<TableModel> returnValue = new ArrayList<>();
 		List<SQLModel> createScripts = rawSql.get(ScriptType.CREATE);
 		for (SQLModel sql : createScripts) {

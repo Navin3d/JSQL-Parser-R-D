@@ -1,7 +1,9 @@
 package gmc.poc.parser.jsql.services.impl;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,11 +13,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
 
@@ -37,24 +39,57 @@ public class SegregationServiceImpl implements SegregationService {
 
 	@Value("${config.directory.path}")
 	private String baseDir;
+	
+	@Autowired
+	private ResourceLoader resourceLoader;
 
 	@Override
 	public void process() {
 		
 	}
+	List<String> filesFromFolders = new ArrayList<>();
+
+	public List<String> getFileFromDirectory(File directory) {
+		
+    	log.error("==>" + directory.getAbsolutePath());
+        if (directory.isDirectory()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                    	getFileFromDirectory(file); // Recursively call the method for nested directories
+                    } else {
+                    	filesFromFolders.add(file.getAbsolutePath());
+                    }
+                }
+            }
+        }
+        
+        log.error("ChecK: " + filesFromFolders.toString());
+        return filesFromFolders;
+        
+    }
 
 	@Bean(name = "rawSql")
 	public Map<ScriptType, List<SQLModel>> rawSql() throws IOException {
 		Map<ScriptType, List<SQLModel>> returnValue = new HashMap<>();
-		ResourcePatternResolver resourcePatternResolver = new PathMatchingResourcePatternResolver();
-		Resource[] resources = resourcePatternResolver.getResources("/" + baseDir + "/input/*.sql");
-		for (Resource resource : resources) {
+		
+		Resource resourceBase = resourceLoader.getResource("classpath:" + baseDir + "/");
+		File baseFolder = resourceBase.getFile();
+		List<String> files = getFileFromDirectory(baseFolder);
+		log.error("Not Empty" + files.toString());
+		
+		for (String filePath : files) {
+			File resource = new File(filePath);
 			SQLModel sqlModel = new SQLModel();
-			sqlModel.setFileName(resource.getFilename());
-			byte[] bData = FileCopyUtils.copyToByteArray(resource.getInputStream());
+			sqlModel.setFileName(resource.getName());
+        	log.error(resource.getName());
+            InputStream inputStream = new FileInputStream(resource);
+			byte[] bData = FileCopyUtils.copyToByteArray(inputStream);
 			String tempScript = (new String(bData, StandardCharsets.UTF_8)).trim();
 			sqlModel.setScript(tempScript);
 			ScriptType scriptType = classifyScripts(tempScript);
+			log.error(scriptType.toString());
 			if (returnValue.get(scriptType) != null)
 				returnValue.get(scriptType).add(sqlModel);
 			else {
